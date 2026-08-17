@@ -26,6 +26,11 @@ test('only an existing admin role can read or write all admin data', () => {
   assert.equal(databaseRules.rules['.write'], adminRule);
 });
 
+test('player reports can be created by players but read and moderated only by an admin', () => {
+  assert.ok(databaseRules.rules.playerReports)
+  assert.equal(databaseRules.rules.playerReports['.read'], "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'")
+});
+
 test('question library is readable by the game but writable only by an admin', () => {
   const adminRule = "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'";
   assert.equal(databaseRules.rules.questions['.read'], true);
@@ -36,6 +41,13 @@ test('the game refreshes its question library from Firebase', () => {
   assert.match(html, /async function loadQuestionLibrary\(\)/);
   assert.match(html, /\$\{DB_URL\}\/questions\.json/);
   assert.match(html, /QS\.splice\(0, QS\.length, \.\.\.approvedQuestions\)/);
+});
+
+test('game lets a player report another player with an optional moderation reason', () => {
+  assert.match(html, /function openPlayerReport\(\)/);
+  assert.match(html, /function submitPlayerReport\(\)/);
+  assert.match(html, /playerReports\.json/);
+  for (const reason of ['obraźliwa nazwa', 'oszustwo', 'trolling']) assert.match(html, new RegExp(reason));
 });
 
 test('admin buttons open the separately deployed React panel', () => {

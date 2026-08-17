@@ -549,6 +549,7 @@ onAuthStateChanged(auth, (user) => {
   </div>
   <div class="label" id="lob-cnt">Gracze (0/4)</div>
   <div class="plist" id="lob-list"></div>
+  <button class="btn btn-dim" type="button" style="font-size:12px;padding:10px" onclick="openPlayerReport()">⚑ Zgłoś gracza</button>
 
   <!-- Main lobby actions -->
   <div class="lob-actions" id="lob-action-row" style="display:none">
@@ -617,6 +618,7 @@ onAuthStateChanged(auth, (user) => {
   <div class="vstatus" id="v-st"></div>
   <button class="btn btn-lit" id="btn-vote" style="display:none" onclick="confirmVote()">Zatwierdź odpowiedź ✓</button>
   <button onclick="reportError(this)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;transition:color .2s">⚑ Zgłoś błąd</button>
+  <button onclick="openPlayerReport()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;transition:color .2s">⚑ Zgłoś gracza</button>
   <button class="btn btn-dim" style="font-size:12px;padding:10px;color:var(--c0);border-color:var(--c0)33;margin-top:4px" onclick="leaveGame()">← Opuść grę</button>
 </div>
 
@@ -630,6 +632,7 @@ onAuthStateChanged(auth, (user) => {
     <div class="wq" id="w-q"></div>
   </div>
   <div id="w-preview"></div>
+  <button onclick="openPlayerReport()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;transition:color .2s">⚑ Zgłoś gracza</button>
   <button class="btn btn-dim" style="font-size:12px;padding:10px;color:var(--c0);border-color:var(--c0)33" onclick="leaveGame()">← Opuść grę</button>
 </div>
 
@@ -646,6 +649,7 @@ onAuthStateChanged(auth, (user) => {
   <button class="btn btn-dim" id="btn-swap-sj" style="display:none" onclick="swapQuestionSJ()"></button>
   <button class="btn btn-lit" id="btn-sj" style="display:none" onclick="submitSJ()">Zatwierdź i pozwól innym odpowiedzieć →</button>
   <button onclick="reportError(this)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;transition:color .2s">⚑ Zgłoś błąd</button>
+  <button onclick="openPlayerReport()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;transition:color .2s">⚑ Zgłoś gracza</button>
   <button class="btn btn-dim" style="font-size:12px;padding:10px;color:var(--c0);border-color:var(--c0)33;margin-top:4px" onclick="leaveGame()">← Opuść grę</button>
 </div>
 
@@ -2170,6 +2174,60 @@ async function reportError(btn){
   }catch(e){console.error('reportError',e);}
 }
 
+let _playerReportTargetSlot=null;
+
+function closePlayerReport(){
+  const modal=$('player-report-modal');
+  if(modal) modal.style.display='none';
+  _playerReportTargetSlot=null;
+}
+
+function openPlayerReport(){
+  if(!GS||!gameId||mySlot===null) return;
+  const targets=(GS.players||[]).map((player,slot)=>({player,slot})).filter(({player,slot})=>player&&slot!==mySlot);
+  if(!targets.length){ alert('Nie ma jeszcze nikogo, kogo możesz zgłosić.'); return; }
+  const list=$('player-report-list');
+  const modal=$('player-report-modal');
+  const reasonWrap=$('player-report-reason-wrap');
+  const feedback=$('player-report-feedback');
+  const submit=$('player-report-submit');
+  _playerReportTargetSlot=null;
+  list.innerHTML=targets.map(({player,slot})=>`<button type="button" onclick="selectPlayerReportTarget(${slot})" style="text-align:left;background:var(--bg);border:1.5px solid var(--rim);border-radius:9px;padding:10px 12px;color:var(--text);font:600 13px 'DM Sans',sans-serif;cursor:pointer">${esc(player.name||'Gracz')}</button>`).join('');
+  reasonWrap.style.display='none'; feedback.textContent=''; submit.disabled=true; submit.style.opacity='.55';
+  modal.style.display='flex';
+}
+
+function selectPlayerReportTarget(slot){
+  const player=GS?.players?.[slot];
+  if(!player||slot===mySlot) return;
+  _playerReportTargetSlot=slot;
+  $('player-report-list').querySelectorAll('button').forEach((button)=>{ button.style.borderColor='var(--rim)'; });
+  const selected=$('player-report-list').querySelector(`button[onclick="selectPlayerReportTarget(${slot})"]`);
+  if(selected) selected.style.borderColor='var(--c0)';
+  $('player-report-reason-wrap').style.display='flex';
+  const submit=$('player-report-submit'); submit.disabled=false; submit.style.opacity='1';
+  $('player-report-feedback').textContent=`Zgłaszasz: ${player.name||'Gracz'}`;
+}
+
+async function submitPlayerReport(){
+  const target=GS?.players?.[_playerReportTargetSlot];
+  const reporter=GS?.players?.[mySlot];
+  if(!target||!reporter||_playerReportTargetSlot===mySlot) return;
+  const submit=$('player-report-submit');
+  const feedback=$('player-report-feedback');
+  const reason=$('player-report-reason').value||null;
+  submit.disabled=true; submit.textContent='Wysyłanie…';
+  try{
+    const response=await fetch(`${DB_URL}/playerReports.json`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gameId,context:GS.phase==='lobby'?'lobby':'game',reporterSlot:mySlot,reporterName:reporter.name||'Gracz',reporterUid:window._currentUser?.uid||null,reportedSlot:_playerReportTargetSlot,reportedName:target.name||'Gracz',reason,status:'open',createdAt:Date.now()})});
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    feedback.textContent='✓ Zgłoszenie wysłane.'; feedback.style.color='var(--c2)'; submit.textContent='Wysłano';
+    setTimeout(closePlayerReport,1200);
+  }catch(error){
+    console.error('submitPlayerReport',error);
+    feedback.textContent='Nie udało się wysłać zgłoszenia. Spróbuj ponownie.'; feedback.style.color='var(--c0)'; submit.disabled=false; submit.textContent='Wyślij zgłoszenie';
+  }
+}
+
 // ── helpers ──
 const SI=()=>GS.subjects[GS.ri]??0;
 const SP=()=>GS.players[SI()];
@@ -2803,7 +2861,8 @@ function renderReveal(){
       ?`<button class="btn btn-lit" onclick="nextRound()">${isLast?'🏆 Wyniki końcowe':'Następna runda →'}</button>`
       :`<div style="text-align:center;padding:14px;font-size:14px;color:var(--muted)">⏳ Czekaj aż host przejdzie dalej…</div>`
     }
-    <button onclick="reportError(this)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;margin-top:4px;transition:color .2s">⚑ Zgłoś błąd</button>`;
+    <button onclick="reportError(this)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;margin-top:4px;transition:color .2s">⚑ Zgłoś błąd</button>
+    <button onclick="openPlayerReport()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;text-align:center;width:100%;margin-top:4px;transition:color .2s">⚑ Zgłoś gracza</button>`;
   show('s-reveal');
 }
 
@@ -4554,6 +4613,17 @@ function desktopJoinGame(){
     </div>
     <div id="stats-modal-body"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">Ładowanie…</div></div>
   </div>
+</div>
+
+<div id="player-report-modal" style="display:none;position:fixed;inset:0;background:#000b;z-index:9999;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closePlayerReport()">
+  <section role="dialog" aria-modal="true" aria-labelledby="player-report-title" style="background:var(--card);border:1.5px solid var(--rim);border-radius:16px;padding:20px;width:min(340px,100%);display:flex;flex-direction:column;gap:12px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:8px"><h2 id="player-report-title" style="font-size:16px;flex:1">Zgłoś gracza</h2><button type="button" onclick="closePlayerReport()" aria-label="Zamknij" style="background:none;border:0;color:var(--muted);font-size:22px;cursor:pointer">×</button></div>
+    <p style="font-size:12px;line-height:1.4;color:var(--muted)">Wybierz gracza z tej rozgrywki.</p>
+    <div id="player-report-list" style="display:flex;flex-direction:column;gap:7px"></div>
+    <div id="player-report-reason-wrap" style="display:none;flex-direction:column;gap:6px"><label for="player-report-reason" style="font-size:12px;font-weight:700">Powód — opcjonalnie</label><select id="player-report-reason" style="background:var(--bg);border:1.5px solid var(--rim);border-radius:9px;padding:10px;color:var(--text);font:inherit"><option value="">Bez wskazania powodu</option><option value="obraźliwa nazwa">Obraźliwa nazwa</option><option value="oszustwo">Oszustwo</option><option value="trolling">Trolling</option></select></div>
+    <div id="player-report-feedback" role="status" style="min-height:16px;font-size:12px;color:var(--muted)"></div>
+    <button id="player-report-submit" type="button" onclick="submitPlayerReport()" disabled style="background:var(--c0);color:#fff;border:0;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;opacity:.55">Wyślij zgłoszenie</button>
+  </section>
 </div>
 
 <div id="auth-modal" class="auth-modal" onclick="if(event.target===this)closeAuthModal()">

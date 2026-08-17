@@ -6,6 +6,12 @@
       ".read": true,
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     },
+    "playerReports": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$reportId": {
+        ".write": "(auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin') || (!data.exists() && newData.hasChildren(['gameId','context','reporterSlot','reporterName','reportedSlot','reportedName','status','createdAt']) && newData.child('status').val() === 'open' && (newData.child('context').val() === 'lobby' || newData.child('context').val() === 'game') && newData.child('gameId').isString() && newData.child('reporterSlot').isNumber() && newData.child('reportedSlot').isNumber() && newData.child('reporterSlot').val() !== newData.child('reportedSlot').val() && newData.child('reporterName').isString() && newData.child('reportedName').isString() && (!newData.child('reason').exists() || newData.child('reason').val() === 'obraźliwa nazwa' || newData.child('reason').val() === 'oszustwo' || newData.child('reason').val() === 'trolling'))"
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
