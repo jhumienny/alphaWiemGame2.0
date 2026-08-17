@@ -267,14 +267,20 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1;}
   </style>
 
 <!-- Firebase Auth SDK -->
-<script src="./firebase-config.local.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, set, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const firebaseConfig = window.__FIREBASE_CONFIG__;
-if (!firebaseConfig) console.warn('Brak lokalnej konfiguracji Firebase.');
+const firebaseConfig = {
+  apiKey: "AIzaSyCDXkXbmEfd8aMlYdRLL-r5Pry67_mm4ss",
+  authDomain: "alpha-wiem-game-2-preprod.firebaseapp.com",
+  databaseURL: "https://alpha-wiem-game-2-preprod-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "alpha-wiem-game-2-preprod",
+  storageBucket: "alpha-wiem-game-2-preprod.firebasestorage.app",
+  messagingSenderId: "74104445165",
+  appId: "1:74104445165:web:fff902c3d77c6586bc94e4"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
