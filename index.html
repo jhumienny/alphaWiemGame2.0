@@ -412,7 +412,13 @@ onAuthStateChanged(auth, (user) => {
         <div class="dh-nav-right">
           <button class="dh-link" type="button" onclick="document.querySelector('.dh-below').scrollIntoView({behavior:'smooth'})">Jak to działa</button>
           <button class="dh-theme" type="button" onclick="toggleTheme()" aria-label="Zmień motyw">☼</button>
-          <button class="dh-primary" type="button" onclick="openAuthModal('login')">Zaloguj się</button>
+          <div id="dh-auth-logged-out">
+            <button class="dh-primary" type="button" onclick="openAuthModal('login')">Zaloguj się</button>
+          </div>
+          <div id="dh-auth-logged-in" style="display:none;align-items:center;gap:8px">
+            <button id="dh-admin-btn" class="dh-primary" type="button" style="display:none" onclick="show('s-admin')">Panel</button>
+            <button class="dh-link" type="button" onclick="authSignOut()">Wyloguj</button>
+          </div>
         </div>
       </nav>
 
@@ -3093,16 +3099,24 @@ window._onAuthStateChanged = function(user) {
   const myqBtn     = $('auth-myq-btn');
   const statsBtn   = $('auth-stats-btn');
   const emailEl    = $('auth-email');
+  const desktopOut = $('dh-auth-logged-out');
+  const desktopIn  = $('dh-auth-logged-in');
+  const desktopAdminBtn = $('dh-admin-btn');
   if (!loggedOut || !loggedIn) return;
   if (user) {
     loggedOut.style.display = 'none';
     loggedIn.style.display  = 'flex';
+    if (desktopOut) desktopOut.style.display = 'none';
+    if (desktopIn) desktopIn.style.display = 'flex';
     if (emailEl)  emailEl.textContent   = (user.email||'').replace(/@wiem\.click$/,'');
     if (statsBtn) statsBtn.style.display = '';
     authCheckRole(user.uid);
   } else {
     loggedOut.style.display = 'flex';
     loggedIn.style.display  = 'none';
+    if (desktopOut) desktopOut.style.display = 'flex';
+    if (desktopIn) desktopIn.style.display = 'none';
+    if (desktopAdminBtn) desktopAdminBtn.style.display = 'none';
     if (adminBtn) adminBtn.style.display = 'none';
     if (myqBtn)   myqBtn.style.display   = 'none';
     if (statsBtn) statsBtn.style.display = 'none';
@@ -3111,6 +3125,7 @@ window._onAuthStateChanged = function(user) {
 
 async function authCheckRole(uid) {
   const adminBtn = $('auth-admin-btn');
+  const desktopAdminBtn = $('dh-admin-btn');
   const myqBtn   = $('auth-myq-btn');
   try {
     const user = window._currentUser;
@@ -3134,13 +3149,16 @@ async function authCheckRole(uid) {
     window._currentUserRole = data;
     if (data === 'admin' || data === 'moderator') {
       if (adminBtn) adminBtn.style.display = '';
+      if (desktopAdminBtn) desktopAdminBtn.style.display = '';
       if (myqBtn)   myqBtn.style.display   = 'none';
     } else {
       if (adminBtn) adminBtn.style.display = 'none';
+      if (desktopAdminBtn) desktopAdminBtn.style.display = 'none';
       if (myqBtn)   myqBtn.style.display   = '';
     }
   } catch(e) {
     if (adminBtn) adminBtn.style.display = 'none';
+    if (desktopAdminBtn) desktopAdminBtn.style.display = 'none';
     if (myqBtn)   myqBtn.style.display   = 'none';
   }
 }

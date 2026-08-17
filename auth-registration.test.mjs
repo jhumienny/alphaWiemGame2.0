@@ -18,6 +18,13 @@ test('registration always starts with a standard user role', () => {
   assert.doesNotMatch(html, /username === ADMIN_USERNAME/);
 });
 
+test('desktop header has signed-in account controls', () => {
+  assert.match(html, /id="dh-auth-logged-out"/);
+  assert.match(html, /id="dh-auth-logged-in"/);
+  assert.match(html, /id="dh-admin-btn"/);
+  assert.match(html, /const desktopOut\s*=\s*\$\('dh-auth-logged-out'\)/);
+});
+
 test('successful authentication immediately refreshes the signed-in interface', () => {
   assert.match(html, /let authenticatedUser;/);
   assert.match(html, /window\._onAuthStateChanged\(authenticatedUser\)/);
