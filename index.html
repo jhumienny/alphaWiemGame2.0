@@ -2123,7 +2123,7 @@ async function reportError(btn){
   try{
     const qIdx=GS.qSeq?.[GS.ri]??GS.ri;
     const q=CQ();
-    const reportedBy=(GS.players[mySlot]?.name||'Gracz')+(window._currentUser?' ('+(window._currentUser.email||'').replace(/@wiem\.app$/,'')+')':'');
+    const reportedBy=(GS.players[mySlot]?.name||'Gracz')+(window._currentUser?' ('+(window._currentUser.email||'').replace(/@wiem\.click$/,'')+')':'');
     const data={
       questionIndex:qIdx,
       questionText:q?q.q:'',
@@ -3100,7 +3100,7 @@ window._onAuthStateChanged = function(user) {
   if (user) {
     loggedOut.style.display = 'none';
     loggedIn.style.display  = 'flex';
-    if (emailEl)  emailEl.textContent   = (user.email||'').replace(/@wiem\.app$/,'');
+    if (emailEl)  emailEl.textContent   = (user.email||'').replace(/@wiem\.click$/,'');
     if (statsBtn) statsBtn.style.display = '';
     authCheckRole(user.uid);
   } else {
@@ -3126,7 +3126,7 @@ async function authCheckRole(uid) {
       await fetch(DB_URL + '/users/' + uid + '.json?auth=' + token, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ username: (user.email||'').replace(/@wiem\.app$/,''), role: 'user', createdAt: Date.now() })
+        body: JSON.stringify({ username: (user.email||'').replace(/@wiem\.click$/,''), role: 'user', createdAt: Date.now() })
       });
     }
     const dn = (userData && userData.displayName) || '';
@@ -3302,7 +3302,7 @@ async function submitAuth() {
     $('auth-inp-pass-confirm').focus();
     return;
   }
-  const fakeEmail = username + '@wiem.app';
+  const fakeEmail = username + '@wiem.click';
   const btn = $('auth-submit-btn');
   btn.disabled = true;
   btn.textContent = '\u23f3';
@@ -4443,7 +4443,7 @@ async function submitMyQuestion() {
     const r = await fetch(DB_URL + '/userQuestions/' + user.uid + '.json?auth=' + token, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({q, qs, a, as, status:'pending', authorEmail: (user.email||'').replace(/@wiem\.app$/,''), createdAt: Date.now()})
+      body: JSON.stringify({q, qs, a, as, status:'pending', authorEmail: (user.email||'').replace(/@wiem\.click$/,''), createdAt: Date.now()})
     });
     if (!r.ok) throw new Error('POST ' + r.status);
 
