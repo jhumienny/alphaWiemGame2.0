@@ -38,16 +38,18 @@ h1 { margin-bottom: 7px; color: #242420; font-family: Manrope, sans-serif; font-
 .search svg, .row-menu svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #373733; font-size: 12px; }
 .search input::placeholder { color: #aaa9a4; }
-.list-summary { display: flex; justify-content: space-between; padding: 0 10px 8px 35px; color: #9b9a95; font-size: 10px; font-weight: 600; }
-.question-list { display: grid; gap: 6px; }
-.question-row { display: grid; grid-template-columns: 20px minmax(0,1fr) 28px; gap: 10px; align-items: start; padding: 15px 12px; border: 1px solid #e3e3df; border-radius: 10px; background: #fff; transition: border-color 160ms ease, box-shadow 160ms ease; }
-.question-row input { width: 15px; height: 15px; margin: 3px 0 0; accent-color: #3e3e39; cursor: pointer; }
-.question-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; color: #a09f9a; font-size: 10px; font-weight: 600; }
-.category { padding: 2px 6px; border-radius: 4px; background: #f1f1ed; color: #73736e; }
-.question-row h2 { margin-bottom: 8px; color: #31312d; font-size: 13px; font-weight: 600; letter-spacing: -.01em; line-height: 1.4; }
-.answers { display: flex; flex-wrap: wrap; gap: 4px; }.answers span { padding: 3px 6px; border-radius: 4px; background: #f6f6f3; color: #898883; font-size: 10px; line-height: 1.35; }
-.row-menu { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #8e8e89; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 150ms cubic-bezier(.23,1,.32,1); }
-.empty-state { display: grid; place-items: center; min-height: 360px; padding: 35px; border: 1px solid #e3e3df; border-radius: 12px; background: #fff; text-align: center; }.empty-mark { width: 28px; height: 28px; margin-bottom: 13px; border: 5px solid #e8e8e3; border-radius: 8px; }.empty-state h2 { margin-bottom: 6px; color: #373733; font-size: 14px; }.empty-state p { margin-bottom: 0; color: #898883; font-size: 12px; }
+.toolbar { padding: 18px 0 12px; }
+.list-summary { padding: 0; color: #777772; font-size: 11px; }
+.question-list { display: grid; gap: 7px; }
+.question-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px auto; gap: 18px; align-items: center; padding: 13px 15px; border: 1px solid #e3e3df; border-radius: 10px; background: #fff; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.question-content { min-width: 0; }
+.question-row h2 { margin: 0 0 7px; color: #31312d; font-size: 13px; font-weight: 650; letter-spacing: -.01em; line-height: 1.35; }
+.answers { display: flex; flex-wrap: wrap; gap: 4px; }.answers span { padding: 3px 6px; border-radius: 4px; background: #f6f6f3; color: #777772; font-size: 10px; line-height: 1.35; }
+.question-details { display: grid; gap: 3px; color: #96958f; font-size: 10px; line-height: 1.35; }
+.author-link { padding: 0; border: 0; background: transparent; color: #555550; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }.author-link:disabled { color: #777772; cursor: default; text-decoration: none; }
+.question-actions, .decision-actions, .editor-actions { display: flex; align-items: center; gap: 6px; }
+.question-actions button, .decision-actions button, .user-list-tools button, .editor-actions > button { height: 29px; padding: 0 9px; border: 1px solid #deded9; border-radius: 6px; background: #fff; color: #53534e; font-size: 11px; font-weight: 700; cursor: pointer; }.question-actions .danger-action { color: #a33b36; border-color: #ead7d4; }.decision-actions button:first-child { background: #282824; border-color: #282824; color: #fff; }
+.empty-state { display: grid; place-items: center; min-height: 220px; padding: 35px; border: 1px solid #e3e3df; border-radius: 12px; background: #fff; text-align: center; }.empty-mark { width: 28px; height: 28px; margin-bottom: 13px; border: 5px solid #e8e8e3; border-radius: 8px; }.empty-state h2 { margin-bottom: 6px; color: #373733; font-size: 14px; }.empty-state p { margin-bottom: 0; color: #898883; font-size: 12px; }
 
 @media (hover: hover) and (pointer: fine) { .back-button:hover { background: #ecece8; color: #393934; }.nav-item:hover:not(.is-active) { background: #efefeb; color: #393934; }.primary-action:hover { background: #41413c; }.question-row:hover { border-color: #cecec8; box-shadow: 0 4px 16px rgba(35,35,30,.035); }.row-menu:hover { background: #efefeb; color: #454540; } }
 .back-button:active, .nav-item:active, .primary-action:active, .row-menu:active { transform: scale(.97); }
@@ -55,3 +57,4 @@ h1 { margin-bottom: 7px; color: #242420; font-family: Manrope, sans-serif; font-
 .access-state { display: grid; place-items: center; gap: 16px; min-height: 100vh; color: #55554f; font: 600 14px 'DM Sans', sans-serif; background: #f7f7f5; }
 .access-state button { padding: 9px 12px; border: 1px solid #deded9; border-radius: 7px; background: #fff; color: #30302c; cursor: pointer; }
 .data-section { margin-top: 28px; }.data-section h2 { margin-bottom: 10px; color: #454540; font-size: 13px; }.data-list { display: grid; gap: 6px; }.data-row { display: grid; gap: 5px; padding: 14px 15px; border: 1px solid #e3e3df; border-radius: 10px; background: #fff; color: #30302d; font-size: 13px; }.data-row small { color: #84847e; font-size: 11px; }.empty-copy { padding: 20px; margin: 0; color: #8a8984; font-size: 12px; text-align: center; }
+.editor-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(25,25,22,.25); }.question-editor { display: grid; gap: 12px; width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 22px; border: 1px solid #dddcd6; border-radius: 12px; background: #fff; box-shadow: 0 18px 50px rgba(25,25,22,.18); }.question-editor h2 { margin: 0; color: #292925; font-size: 17px; }.question-editor label { display: grid; gap: 5px; color: #676762; font-size: 11px; font-weight: 700; }.question-editor textarea, .question-editor input { width: 100%; border: 1px solid #deded9; border-radius: 7px; background: #fff; color: #292925; font: 13px 'DM Sans', sans-serif; padding: 8px; }.question-editor textarea { min-height: 62px; resize: vertical; }.editor-actions { justify-content: flex-end; margin-top: 3px; }.user-list-tools { min-height: 20px; margin-top: 18px; }

@@ -42,6 +42,9 @@ describe('Admin workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Pytania' })).toBeInTheDocument()
     expect(screen.getByText('Pytanie z biblioteki')).toBeInTheDocument()
     expect(screen.getByText('Pytanie zaakceptowane')).toBeInTheDocument()
+    expect(screen.getByText('Kuba')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Edytuj' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Usuń' })).toHaveLength(2)
     expect(screen.queryByText('Pytanie odrzucone')).not.toBeInTheDocument()
   })
 
