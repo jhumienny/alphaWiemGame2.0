@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { get, ref, update } from 'firebase/database'
 import { auth, database } from './firebase'
 import { flattenUserQuestions, isAdminRole, questionLibrary } from './adminData'
@@ -78,7 +78,13 @@ function App() {
   const [focusedUserId, setFocusedUserId] = useState(null)
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() => new Set())
   const [expandedGroups, setExpandedGroups] = useState(() => ({ Pytania: true, Gracze: true }))
+  const [theme, setTheme] = useState(() => window.localStorage.getItem('wiem-admin-theme') || 'dark')
   const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {} })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem('wiem-admin-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     let active = true
@@ -179,7 +185,7 @@ function App() {
   if (status === 'error') return <main className="access-state"><strong>{error}</strong><button type="button" onClick={redirectToGame}>Wróć do gry</button></main>
 
   return <div className="admin-app">
-    <header className="topbar"><a className="brand" href="../">Wiem!</a><span className="topbar-separator" /><span className="topbar-title">Panel zarządzania</span><span className="profile" aria-label="Administrator">A</span></header>
+    <header className="topbar"><a className="brand" href="../">Wiem!</a><span className="topbar-separator" /><span className="topbar-title">Panel zarządzania</span><div className="profile-menu"><button className="profile" type="button" aria-label="Administrator">A</button><div className="profile-dropdown" role="menu"><button type="button" role="menuitem">Profil</button><button className="profile-theme" type="button" role="menuitem" aria-label={theme === 'dark' ? 'Włącz jasny motyw' : 'Włącz ciemny motyw'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀' : '☾'}</button><button className="logout-action" type="button" role="menuitem" onClick={() => signOut(auth)}>Wyloguj się</button></div></div></header>
     <div className="app-shell">
       <aside className="sidebar"><button className="back-button" type="button" onClick={redirectToGame}><Icon name="back" /> Wróć do gry</button><nav aria-label="Panel administracyjny">{navigationGroups.map((group) => <section className="nav-card" key={group.title}><button className="nav-group-toggle" type="button" aria-expanded={expandedGroups[group.title]} aria-controls={`nav-group-${group.title}`} onClick={() => toggleGroup(group.title)}><span>{group.title}</span><span className="nav-group-chevron"><Icon name="chevron" /></span></button><div className={`nav-group-items ${expandedGroups[group.title] ? '' : 'is-collapsed'}`} id={`nav-group-${group.title}`} aria-hidden={!expandedGroups[group.title]}><div className="nav-group-items-inner">{group.items.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></div></section>)}<div className="nav-utilities">{utilityNavigation.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></nav><p className="sidebar-foot">Wiem! · administracja</p></aside>
       <main className="workspace">

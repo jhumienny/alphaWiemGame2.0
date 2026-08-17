@@ -4,14 +4,16 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
-const { getMock, updateMock } = vi.hoisted(() => ({
+const { getMock, updateMock, signOutMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   updateMock: vi.fn().mockResolvedValue(undefined),
+  signOutMock: vi.fn().mockResolvedValue(undefined),
 }))
 const snapshot = (value) => ({ val: () => value })
 
 vi.mock('./firebase', () => ({ auth: {}, database: {} }))
 vi.mock('firebase/auth', () => ({
+  signOut: signOutMock,
   onAuthStateChanged: (_auth, callback) => {
     callback({ uid: 'admin-uid' })
     return () => {}
@@ -39,7 +41,7 @@ vi.mock('firebase/database', () => ({
 import App from './App'
 
 afterEach(cleanup)
-beforeEach(() => { updateMock.mockClear(); vi.spyOn(window, 'confirm').mockReturnValue(true) })
+beforeEach(() => { updateMock.mockClear(); signOutMock.mockClear(); window.localStorage.clear(); delete document.documentElement.dataset.theme; vi.spyOn(window, 'confirm').mockReturnValue(true) })
 
 describe('Admin workspace', () => {
   it('shows data only after the authenticated account has the exact admin role', async () => {
@@ -88,6 +90,21 @@ describe('Admin workspace', () => {
     await screen.findByRole('heading', { name: 'Baza pytań' })
     expect(screen.getByRole('button', { name: /Propozycje pytań\s*1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Zgłoszone pytania\s*1/ })).toBeInTheDocument()
+  })
+
+  it('defaults to dark mode and lets the administrator switch to a persisted light theme', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Baza pytań' })
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(screen.getByRole('menuitem', { name: 'Profil' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Wyloguj się' })).toBeInTheDocument()
+    const themeToggle = screen.getByRole('menuitem', { name: 'Włącz jasny motyw' })
+    fireEvent.click(themeToggle)
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(window.localStorage.getItem('wiem-admin-theme')).toBe('light')
+    expect(screen.getByRole('menuitem', { name: 'Włącz ciemny motyw' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wyloguj się' }))
+    expect(signOutMock).toHaveBeenCalledWith({})
   })
 
   it('collapses and expands each grouped navigation card with an explicit arrow control', async () => {
