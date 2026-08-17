@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
@@ -25,8 +25,14 @@ vi.mock('firebase/database', () => ({
     'users/admin-uid/role': 'admin',
     questions: {
       base1: { q: 'Pytanie z biblioteki', a: ['A', 'B'], source: 'seed' },
-      approved1: { q: 'Pytanie zaakceptowane', a: ['C', 'D'], status: 'approved', source: 'user' },
+      approved1: { q: 'Pytanie zaakceptowane', a: ['C', 'D'], categoryId: 'cat_impreza', status: 'approved', source: 'user' },
       rejected1: { q: 'Pytanie odrzucone', status: 'rejected' },
+    },
+    questionCategories: {
+      cat_players: { name: 'Kto z graczy' },
+      cat_impreza: { name: 'Impreza' },
+      cat_zyciowka: { name: 'Życiówka' },
+      cat_ambicje: { name: 'Ambicje i cele' },
     },
     games: { game1: { phase: 'lobby', createdAt: 10 } },
     permanentRooms: { room1: { name: 'Piątkowa ekipa', created: 20 } },
@@ -41,15 +47,88 @@ vi.mock('firebase/database', () => ({
 import App from './App'
 
 afterEach(cleanup)
-beforeEach(() => { updateMock.mockClear(); signOutMock.mockClear(); window.localStorage.clear(); delete document.documentElement.dataset.theme; vi.spyOn(window, 'confirm').mockReturnValue(true) })
+function installDefaultGetMock() {
+  getMock.mockImplementation(async (path) => snapshot({
+    'users/admin-uid/role': 'admin',
+    questions: {
+      base1: { q: 'Pytanie z biblioteki', a: ['A', 'B'], source: 'seed' },
+      approved1: { q: 'Pytanie zaakceptowane', a: ['C', 'D'], categoryId: 'cat_impreza', status: 'approved', source: 'user' },
+      rejected1: { q: 'Pytanie odrzucone', status: 'rejected' },
+    },
+    questionCategories: {
+      cat_players: { name: 'Kto z graczy' }, cat_impreza: { name: 'Impreza' },
+      cat_zyciowka: { name: 'Życiówka' }, cat_ambicje: { name: 'Ambicje i cele' },
+    },
+    games: { game1: { phase: 'lobby', createdAt: 10 } }, permanentRooms: { room1: { name: 'Piątkowa ekipa', created: 20 } },
+    reports: { report1: { questionText: 'Zgłoszone pytanie', status: 'open', reportedAt: 30 } },
+    playerReports: { playerReport1: { reportedName: 'Gracz testowy', reporterName: 'Zgłaszający', reason: 'trolling', context: 'game', createdAt: 35 } },
+    userQuestions: { user1: { question1: { q: 'Pytanie od gracza', a: ['A', 'B'], status: 'pending', createdAt: 40 } } },
+    users: { 'admin-uid': { username: 'kuba', role: 'admin', createdAt: 50 } },
+  }[path] || null))
+}
+beforeEach(() => { getMock.mockClear(); installDefaultGetMock(); updateMock.mockClear(); signOutMock.mockClear(); window.localStorage.clear(); delete document.documentElement.dataset.theme; vi.spyOn(window, 'confirm').mockReturnValue(true) })
 
 describe('Admin workspace', () => {
+  it('migrates legacy question labels and seeds only the four default categories', async () => {
+    getMock.mockImplementation(async (path) => snapshot({
+      'users/admin-uid/role': 'admin',
+      questions: {
+        players: { q: 'Kto zaczyna?', type: 'players' },
+        party: { q: 'Kto tańczy?', cat: 'impreza' },
+        unassigned: { q: 'Bez kategorii' },
+      },
+      questionCategories: {},
+      games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {},
+    }[path] || null))
+
+    render(<App />)
+    await screen.findByText('Kto zaczyna?')
+
+    expect(updateMock).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      'questionCategories/cat_players': { name: 'Kto z graczy' },
+      'questionCategories/cat_impreza': { name: 'Impreza' },
+      'questionCategories/cat_zyciowka': { name: 'Życiówka' },
+      'questionCategories/cat_ambicje': { name: 'Ambicje i cele' },
+      'questions/players/categoryId': 'cat_players',
+      'questions/party/categoryId': 'cat_impreza',
+    }))
+    expect(Object.keys(updateMock.mock.calls[0][1])).not.toContain('questionCategories/cat_demo')
+  })
+
+  it('filters questions by an assigned category and by missing category', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Baza pytań' })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtruj według kategorii' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Impreza' }))
+    expect(screen.getByText('Pytanie zaakceptowane')).toBeInTheDocument()
+    expect(screen.queryByText('Pytanie z biblioteki')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Filtruj według kategorii' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Bez przypisanej kategorii' }))
+    expect(screen.getByText('Pytanie z biblioteki')).toBeInTheDocument()
+  })
+
+  it('adds a category and assigns it when creating a question', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Baza pytań' })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtruj według kategorii' }))
+    fireEvent.change(screen.getByLabelText('Nazwa nowej kategorii'), { target: { value: 'Muzyka' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Dodaj kategorię' }))
+    expect(updateMock).toHaveBeenCalledWith(undefined, expect.objectContaining({ 'questionCategories/cat_muzyka': { name: 'Muzyka' } }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dodaj pytanie' }))
+    await screen.findByRole('option', { name: 'Muzyka' })
+    fireEvent.change(screen.getByLabelText('Kategoria'), { target: { value: 'cat_muzyka' } })
+    fireEvent.change(screen.getByLabelText('Pytanie dla pozostałych'), { target: { value: 'Muzyczne pytanie' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz zmiany' }))
+    await waitFor(() => expect(Object.entries(updateMock.mock.calls.at(-1)[1]).some(([path, value]) => /^questions\/manual-/.test(path) && value.categoryId === 'cat_muzyka')).toBe(true))
+  })
+
   it('shows data only after the authenticated account has the exact admin role', async () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Baza pytań' })).toBeInTheDocument()
     expect(screen.getByText('Pytanie z biblioteki')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Kuba' })).toBeInTheDocument()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
     expect(screen.getAllByRole('button', { name: /Edytuj/ })).toHaveLength(2)
     expect(screen.queryByText('Pytanie odrzucone')).not.toBeInTheDocument()
   })
@@ -63,6 +142,19 @@ describe('Admin workspace', () => {
     expect(deleteSelected).toBeEnabled()
     fireEvent.click(deleteSelected)
     expect(Object.values(updateMock.mock.calls[0][1])[0]).toBeNull()
+  })
+
+  it('selects and deselects every visible library question with the toolbar checkbox', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Baza pytań' })
+    const selectAll = screen.getByRole('checkbox', { name: 'Zaznacz wszystkie widoczne pytania' })
+    fireEvent.click(selectAll)
+    expect(screen.getByRole('checkbox', { name: 'Zaznacz Pytanie zaakceptowane' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Zaznacz Pytanie z biblioteki' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Usuń zaznaczone (2)' })).toBeEnabled()
+    fireEvent.click(selectAll)
+    expect(screen.getByRole('checkbox', { name: 'Zaznacz Pytanie zaakceptowane' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Zaznacz Pytanie z biblioteki' })).not.toBeChecked()
   })
 
   it('opens manual creation and saves it through Firebase', async () => {

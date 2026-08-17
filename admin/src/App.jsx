@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { get, ref, update } from 'firebase/database'
 import { auth, database } from './firebase'
 import { flattenUserQuestions, isAdminRole, questionLibrary } from './adminData'
 import './App.css'
+
+const defaultQuestionCategories = {
+  cat_players: { name: 'Kto z graczy' },
+  cat_impreza: { name: 'Impreza' },
+  cat_zyciowka: { name: 'Życiówka' },
+  cat_ambicje: { name: 'Ambicje i cele' },
+}
 
 const navigationGroups = [
   {
@@ -68,6 +75,20 @@ function userMetric(user, names) {
   return 0
 }
 
+function legacyCategoryFor(question) {
+  if (question?.categoryId) return question.categoryId
+  if (question?.type === 'players') return 'cat_players'
+  if (question?.cat === 'impreza') return 'cat_impreza'
+  if (question?.cat === 'zyciowka') return 'cat_zyciowka'
+  if (question?.cat === 'ambicje') return 'cat_ambicje'
+  return ''
+}
+
+function categoryIdFromName(name) {
+  const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return slug ? `cat_${slug}` : ''
+}
+
 function App() {
   const [tab, setTab] = useState('questions')
   const [query, setQuery] = useState('')
@@ -77,10 +98,14 @@ function App() {
   const [editor, setEditor] = useState(null)
   const [focusedUserId, setFocusedUserId] = useState(null)
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() => new Set())
+  const selectAllQuestionsRef = useRef(null)
   const [expandedGroups, setExpandedGroups] = useState(() => ({ Pytania: false, Gracze: false }))
   const [theme, setTheme] = useState(() => window.localStorage.getItem('wiem-admin-theme') || 'dark')
   document.documentElement.dataset.theme = theme
-  const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {} })
+  const [data, setData] = useState({ questions: {}, questionCategories: {}, games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {} })
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -94,10 +119,23 @@ function App() {
       try {
         const roleSnapshot = await get(ref(database, `users/${user.uid}/role`))
         if (!isAdminRole(roleSnapshot.val())) return redirectToGame()
-        const paths = ['questions', 'games', 'permanentRooms', 'reports', 'playerReports', 'userQuestions', 'users']
+        const paths = ['questions', 'questionCategories', 'games', 'permanentRooms', 'reports', 'playerReports', 'userQuestions', 'users']
         const snapshots = await Promise.all(paths.map((path) => get(ref(database, path))))
         if (!active) return
-        setData(Object.fromEntries(paths.map((path, index) => [path, snapshots[index].val() || {}])))
+        const loaded = Object.fromEntries(paths.map((path, index) => [path, snapshots[index].val() || {}]))
+        const migration = {}
+        for (const [id, category] of Object.entries(defaultQuestionCategories)) {
+          if (!loaded.questionCategories[id]) migration[`questionCategories/${id}`] = category
+        }
+        for (const [id, question] of Object.entries(loaded.questions)) {
+          const categoryId = legacyCategoryFor(question)
+          if (categoryId && !question.categoryId) migration[`questions/${id}/categoryId`] = categoryId
+        }
+        if (Object.keys(migration).length) await update(ref(database), migration)
+        if (!active) return
+        loaded.questionCategories = { ...defaultQuestionCategories, ...loaded.questionCategories }
+        loaded.questions = Object.fromEntries(Object.entries(loaded.questions).map(([id, question]) => [id, { ...question, categoryId: question.categoryId || legacyCategoryFor(question) }]))
+        setData(loaded)
         setStatus('ready')
       } catch {
         if (!active) return
@@ -133,9 +171,30 @@ function App() {
     const payload = { ...editor, q: editor.q.trim(), qs: editor.qs.trim(), a: editor.a.map((answer) => answer.trim()), as: editor.as.map((answer) => answer.trim()) }
     delete payload.id
     delete payload.isNew
-    await update(ref(database), { [`questions/${editor.id}`]: payload })
-    setData((current) => ({ ...current, questions: { ...current.questions, [editor.id]: payload } }))
-    setEditor(null)
+    try {
+      await update(ref(database), { [`questions/${editor.id}`]: payload })
+      setData((current) => ({ ...current, questions: { ...current.questions, [editor.id]: payload } }))
+      setEditor(null)
+    } catch { setError('Nie udało się zapisać pytania.') }
+  }
+
+  async function addCategory(event) {
+    event.preventDefault()
+    const name = newCategoryName.trim()
+    if (!name) return
+    const id = categoryIdFromName(name)
+    if (!id) return
+    if (data.questionCategories[id]) {
+      setError('Kategoria o takiej nazwie już istnieje.')
+      return
+    }
+    const category = { name }
+    try {
+      await update(ref(database), { [`questionCategories/${id}`]: category })
+      setData((current) => ({ ...current, questionCategories: { ...current.questionCategories, [id]: category } }))
+      setNewCategoryName('')
+      setCategoryFilter(id)
+    } catch { setError('Nie udało się dodać kategorii.') }
   }
 
   function toggleQuestion(id) {
@@ -143,6 +202,16 @@ function App() {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      return next
+    })
+  }
+
+  function toggleVisibleQuestions() {
+    const visibleIds = filteredLibrary.map((item) => item.id)
+    setSelectedQuestionIds((current) => {
+      const next = new Set(current)
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => next.has(id))
+      visibleIds.forEach((id) => allVisibleSelected ? next.delete(id) : next.add(id))
       return next
     })
   }
@@ -169,7 +238,13 @@ function App() {
   const users = useMemo(() => toEntries(data.users).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)), [data.users])
   const usersById = useMemo(() => Object.fromEntries(users.map((user) => [user.id, user])), [users])
   const visibleUsers = useMemo(() => focusedUserId ? users.filter((user) => user.id === focusedUserId) : users, [users, focusedUserId])
-  const filteredLibrary = useMemo(() => library.filter((item) => item.text.toLowerCase().includes(query.toLowerCase())), [library, query])
+  const categories = useMemo(() => Object.entries(data.questionCategories).map(([id, category]) => ({ id, ...category })).sort((a, b) => a.name.localeCompare(b.name, 'pl')), [data.questionCategories])
+  const filteredLibrary = useMemo(() => library.filter((item) => item.text.toLowerCase().includes(query.toLowerCase()) && (!categoryFilter || (categoryFilter === '__unassigned__' ? !item.categoryId : item.categoryId === categoryFilter))), [library, query, categoryFilter])
+  const allVisibleQuestionsSelected = filteredLibrary.length > 0 && filteredLibrary.every((item) => selectedQuestionIds.has(item.id))
+  const someVisibleQuestionsSelected = filteredLibrary.some((item) => selectedQuestionIds.has(item.id))
+  useEffect(() => {
+    if (selectAllQuestionsRef.current) selectAllQuestionsRef.current.indeterminate = someVisibleQuestionsSelected && !allVisibleQuestionsSelected
+  }, [allVisibleQuestionsSelected, someVisibleQuestionsSelected])
   const playerStats = useMemo(() => ({
     playerCount: users.length,
     adminCount: users.filter((user) => user.role === 'admin').length,
@@ -191,7 +266,7 @@ function App() {
       <aside className="sidebar"><button className="back-button" type="button" onClick={redirectToGame}><Icon name="back" /> Wróć do gry</button><nav aria-label="Panel administracyjny">{navigationGroups.map((group) => <section className={`nav-card ${expandedGroups[group.title] ? '' : 'is-collapsed'}`} key={group.title}><button className="nav-group-toggle" type="button" aria-expanded={expandedGroups[group.title]} aria-controls={`nav-group-${group.title}`} onClick={() => toggleGroup(group.title)}><span>{group.title}</span><span className="nav-group-chevron"><Icon name="chevron" /></span></button><div className={`nav-group-items ${expandedGroups[group.title] ? '' : 'is-collapsed'}`} id={`nav-group-${group.title}`} aria-hidden={!expandedGroups[group.title]}><div className="nav-group-items-inner">{group.items.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></div></section>)}<div className="nav-utilities">{utilityNavigation.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></nav><p className="sidebar-foot">Wiem! · administracja</p></aside>
       <main className="workspace">
         <div className="workspace-heading"><div><h1>{screen.title}</h1><p>{screen.description}</p></div></div>
-        {tab === 'questions' && <section aria-label="Lista pytań"><div className="toolbar"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="question-toolbar-right"><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><button className="bulk-delete" type="button" disabled={!selectedQuestionIds.size} onClick={deleteSelectedQuestions}>Usuń zaznaczone ({selectedQuestionIds.size})</button><button className="primary-action" type="button" onClick={startManualQuestion}>Dodaj pytanie</button></div></div><div className="question-list">{filteredLibrary.map((item) => { const author = authorFor(item, usersById); return <article className={`question-row ${selectedQuestionIds.has(item.id) ? 'is-selected' : ''}`} key={item.id}><label className="question-check"><input type="checkbox" checked={selectedQuestionIds.has(item.id)} onChange={() => toggleQuestion(item.id)} aria-label={`Zaznacz ${item.text}`} /></label><div className="question-content"><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div><div className="question-details"><span>Dodano: {formatDate(item.approvedAt || item.createdAt)}</span><span>przez <button className="author-link" type="button" onClick={() => openProfile(author.uid)} disabled={!author.uid}>{author.label}</button></span></div><div className="question-actions"><button type="button" aria-label={`Edytuj ${item.text}`} onClick={() => setEditor({ ...item, a: [...item.answers], as: [...(item.as || [])], qs: item.qs || '' })}>Edytuj</button></div></article>})}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
+        {tab === 'questions' && <section aria-label="Lista pytań"><div className="toolbar"><div className="question-toolbar-left"><label className="select-all-questions" title="Zaznacz wszystkie widoczne pytania"><input ref={selectAllQuestionsRef} type="checkbox" checked={allVisibleQuestionsSelected} disabled={!filteredLibrary.length} onChange={toggleVisibleQuestions} aria-label="Zaznacz wszystkie widoczne pytania" /></label><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><CategoryFilter categories={categories} value={categoryFilter} isOpen={isCategoryFilterOpen} newCategoryName={newCategoryName} onToggle={() => setIsCategoryFilterOpen((open) => !open)} onSelect={(id) => { setCategoryFilter(id); setIsCategoryFilterOpen(false) }} onNameChange={setNewCategoryName} onAdd={addCategory} /></div><div className="question-toolbar-right"><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><button className="bulk-delete" type="button" disabled={!selectedQuestionIds.size} onClick={deleteSelectedQuestions}>Usuń zaznaczone ({selectedQuestionIds.size})</button><button className="primary-action" type="button" onClick={startManualQuestion}>Dodaj pytanie</button></div></div><div className="question-list">{filteredLibrary.map((item) => { const author = authorFor(item, usersById); return <article className={`question-row ${selectedQuestionIds.has(item.id) ? 'is-selected' : ''}`} key={item.id}><label className="question-check"><input type="checkbox" checked={selectedQuestionIds.has(item.id)} onChange={() => toggleQuestion(item.id)} aria-label={`Zaznacz ${item.text}`} /></label><div className="question-content"><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div><div className="question-details"><span>Dodano: {formatDate(item.approvedAt || item.createdAt)}</span><span>przez <button className="author-link" type="button" onClick={() => openProfile(author.uid)} disabled={!author.uid}>{author.label}</button></span></div><div className="question-actions"><button type="button" aria-label={`Edytuj ${item.text}`} onClick={() => setEditor({ ...item, a: [...item.answers], as: [...(item.as || [])], qs: item.qs || '' })}>Edytuj</button></div></article>})}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
         {tab === 'pending' && <List title="Oczekujące propozycje" items={pending} render={(item) => <><strong>{item.text}</strong><small>{item.uid} · {formatDate(item.createdAt)}</small><div className="decision-actions"><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'approved')}>Zaakceptuj</button><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'rejected')}>Odrzuć</button></div></>} />}
         {tab === 'reports' && <List title="Zgłoszone pytania" items={reports} render={(item) => <><strong>{item.questionText || item.qText || 'Zgłoszenie bez treści pytania'}</strong><small>{item.status || (item.resolved ? 'rozwiązane' : 'otwarte')} · {formatDate(item.reportedAt)}</small></>} />}
         {tab === 'playerReports' && <List title="Zgłoszeni gracze" items={playerReports} render={(item) => <><strong>{item.reportedName || item.reportedUserId || item.userId || item.uid || 'Nieznany gracz'}</strong><small>Zgłosił/a: {item.reporterName || 'nieznany gracz'} · {item.reason || 'bez wskazania powodu'} · {item.context === 'lobby' ? 'lobby' : 'rozgrywka'} · {item.status || (item.resolved ? 'rozwiązane' : 'otwarte')} · {formatDate(item.reportedAt || item.createdAt)}</small></>} />}
@@ -200,12 +275,13 @@ function App() {
         {tab === 'stats' && <Stats stats={playerStats} />}
       </main>
     </div>
-    {editor && <QuestionEditor editor={editor} onChange={setEditor} onCancel={() => setEditor(null)} onSave={saveQuestion} />}
+    {editor && <QuestionEditor categories={categories} editor={editor} onChange={setEditor} onCancel={() => setEditor(null)} onSave={saveQuestion} />}
   </div>
 }
 
+function CategoryFilter({ categories, value, isOpen, newCategoryName, onToggle, onSelect, onNameChange, onAdd }) { return <div className="category-filter"><button className="category-filter-toggle" type="button" aria-label="Filtruj według kategorii" aria-expanded={isOpen} onClick={onToggle}>Filtruj</button>{isOpen && <div className="category-filter-panel"><button type="button" className={!value ? 'is-selected' : ''} onClick={() => onSelect('')}>Wszystkie kategorie</button><button type="button" className={value === '__unassigned__' ? 'is-selected' : ''} onClick={() => onSelect('__unassigned__')}>Bez przypisanej kategorii</button>{categories.map((category) => <button type="button" className={value === category.id ? 'is-selected' : ''} key={category.id} onClick={() => onSelect(category.id)}>{category.name}</button>)}<form onSubmit={onAdd}><input aria-label="Nazwa nowej kategorii" value={newCategoryName} onChange={(event) => onNameChange(event.target.value)} placeholder="Nowa kategoria" /><button type="submit">Dodaj kategorię</button></form></div>}</div> }
 function NavButton({ item, tab, count, onSelect }) { return <button className={`nav-item ${tab === item.id ? 'is-active' : ''}`} type="button" onClick={() => onSelect(item.id)}><span>{item.label}</span>{count ? <span className="nav-count">{count}</span> : null}</button> }
 function Stats({ stats }) { return <section className="stats-grid" aria-label="Podsumowanie statystyk graczy"><article><span>Łącznie graczy</span><strong>{stats.playerCount}</strong></article><article><span>Administratorzy</span><strong>{stats.adminCount}</strong></article><article><span>Rozegrane gry</span><strong>{stats.gamesPlayed}</strong></article><article><span>Wygrane</span><strong>{stats.wins}</strong></article></section> }
-function QuestionEditor({ editor, onChange, onCancel, onSave }) { const setAnswer = (field, index, value) => { const values = [...editor[field]]; values[index] = value; onChange({ ...editor, [field]: values }) }; return <div className="editor-backdrop"><form className="question-editor" onSubmit={(event) => { event.preventDefault(); onSave() }}><h2>{editor.isNew ? 'Dodaj pytanie' : 'Edytuj pytanie'}</h2><label>Pytanie dla pozostałych<textarea value={editor.q} onChange={(event) => onChange({ ...editor, q: event.target.value })} /></label><label>Pytanie dla osoby odpowiadającej<textarea value={editor.qs} onChange={(event) => onChange({ ...editor, qs: event.target.value })} /></label>{editor.a.map((answer, index) => <label key={index}>Odpowiedź {index + 1}<input value={answer} onChange={(event) => setAnswer('a', index, event.target.value)} /></label>)}<div className="editor-actions"><button type="button" onClick={onCancel}>Anuluj</button><button className="primary-action" type="submit">Zapisz zmiany</button></div></form></div> }
+function QuestionEditor({ categories, editor, onChange, onCancel, onSave }) { const setAnswer = (field, index, value) => { const values = [...editor[field]]; values[index] = value; onChange({ ...editor, [field]: values }) }; return <div className="editor-backdrop"><form className="question-editor" onSubmit={(event) => { event.preventDefault(); onSave() }}><h2>{editor.isNew ? 'Dodaj pytanie' : 'Edytuj pytanie'}</h2><label>Kategoria<select value={editor.categoryId || ''} onChange={(event) => onChange({ ...editor, categoryId: event.target.value })}><option value="">Bez przypisanej kategorii</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label>Pytanie dla pozostałych<textarea value={editor.q} onChange={(event) => onChange({ ...editor, q: event.target.value })} /></label><label>Pytanie dla osoby odpowiadającej<textarea value={editor.qs} onChange={(event) => onChange({ ...editor, qs: event.target.value })} /></label>{editor.a.map((answer, index) => <label key={index}>Odpowiedź {index + 1}<input value={answer} onChange={(event) => setAnswer('a', index, event.target.value)} /></label>)}<div className="editor-actions"><button type="button" onClick={onCancel}>Anuluj</button><button className="primary-action" type="submit">Zapisz zmiany</button></div></form></div> }
 function List({ title, items, render }) { return <section className="data-section"><h2>{title}</h2><div className="data-list">{items.map((item) => <article className="data-row" key={item.id}>{render(item)}</article>)}{!items.length && <p className="empty-copy">Brak danych.</p>}</div></section> }
 export default App
