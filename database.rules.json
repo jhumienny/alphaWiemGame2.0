@@ -1,6 +1,18 @@
 {
   "rules": {
     ".read": false,
-    ".write": false
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && ((!data.exists() && newData.child('role').val() === 'user') || (data.exists() && newData.child('role').val() === data.child('role').val()))"
+      }
+    },
+    "usernames": {
+      "$username": {
+        ".read": true,
+        ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+      }
+    }
   }
 }

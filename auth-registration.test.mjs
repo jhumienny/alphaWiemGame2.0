@@ -13,6 +13,11 @@ test('registration uses a technical @wiem.click address instead of asking for an
   assert.match(html, /id="auth-inp-email" type="text"/);
 });
 
+test('registration always starts with a standard user role', () => {
+  assert.match(html, /const role = 'user';/);
+  assert.doesNotMatch(html, /username === ADMIN_USERNAME/);
+});
+
 test('registration rejects unequal passwords before creating an account', () => {
   assert.match(html, /Hasła nie są takie same/);
   assert.match(html, /pass !== passConfirm/);
