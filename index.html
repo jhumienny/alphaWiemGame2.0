@@ -3308,8 +3308,10 @@ async function submitAuth() {
     const auth = window._fbAuth;
     const fns  = window._fbAuthFns;
     if (!auth || !fns) throw new Error('auth/not-ready');
+    let authenticatedUser;
     if (_authMode === 'login') {
       const loginCred = await fns.signInWithEmailAndPassword(auth, fakeEmail, pass);
+      authenticatedUser = loginCred.user;
       try {
         const loginToken = await loginCred.user.getIdToken();
         const roleR = await fetch(DB_URL + '/users/' + loginCred.user.uid + '/role.json?auth=' + loginToken);
@@ -3332,6 +3334,7 @@ async function submitAuth() {
       }
       const displayName = username;
       const cred = await fns.createUserWithEmailAndPassword(auth, fakeEmail, pass);
+      authenticatedUser = cred.user;
       const uid  = cred.user.uid;
       const role = 'user';
       const regToken = await cred.user.getIdToken();
@@ -3352,6 +3355,8 @@ async function submitAuth() {
         if ($('inp-name')) $('inp-name').value = displayName;
       }
     }
+    window._currentUser = authenticatedUser;
+    if (typeof window._onAuthStateChanged === 'function') window._onAuthStateChanged(authenticatedUser);
     closeAuthModal();
   } catch(e) {
     authShowErr(authFirebaseErrMsg(e.code || e.message));

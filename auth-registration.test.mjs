@@ -18,6 +18,11 @@ test('registration always starts with a standard user role', () => {
   assert.doesNotMatch(html, /username === ADMIN_USERNAME/);
 });
 
+test('successful authentication immediately refreshes the signed-in interface', () => {
+  assert.match(html, /let authenticatedUser;/);
+  assert.match(html, /window\._onAuthStateChanged\(authenticatedUser\)/);
+});
+
 test('registration rejects unequal passwords before creating an account', () => {
   assert.match(html, /Hasła nie są takie same/);
   assert.match(html, /pass !== passConfirm/);
