@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+const viteConfig = readFileSync(new URL('./admin/vite.config.js', import.meta.url), 'utf8');
+const databaseRules = JSON.parse(readFileSync(new URL('./database.rules.json', import.meta.url), 'utf8'));
 
 test('registration has a confirmation-password field', () => {
   assert.match(html, /id="auth-inp-pass-confirm"/);
@@ -16,6 +18,18 @@ test('registration uses a technical @wiem.click address instead of asking for an
 test('registration always starts with a standard user role', () => {
   assert.match(html, /const role = 'user';/);
   assert.doesNotMatch(html, /username === ADMIN_USERNAME/);
+});
+
+test('only an existing admin role can read or write all admin data', () => {
+  const adminRule = "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'";
+  assert.equal(databaseRules.rules['.read'], adminRule);
+  assert.equal(databaseRules.rules['.write'], adminRule);
+});
+
+test('admin buttons open the separately deployed React panel', () => {
+  assert.match(html, /id="dh-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);
+  assert.match(html, /id="auth-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);
+  assert.match(viteConfig, /base:\s*'\/alphaWiemGame2\.0\/admin\/'/);
 });
 
 test('desktop header has signed-in account controls', () => {

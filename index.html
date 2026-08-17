@@ -309,7 +309,7 @@ onAuthStateChanged(auth, (user) => {
       </div>
       <div id="auth-logged-in" style="display:none;align-items:center;gap:8px">
         <span id="auth-email" style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-        <button id="auth-admin-btn" onclick="show('s-admin')" style="display:none;padding:6px 12px;border-radius:8px;border:none;background:#534AB7;color:#fff;font-size:11px;font-weight:700;cursor:pointer">⚙ Panel</button>
+        <button id="auth-admin-btn" onclick="location.href='./admin/'" style="display:none;padding:6px 12px;border-radius:8px;border:none;background:#534AB7;color:#fff;font-size:11px;font-weight:700;cursor:pointer">⚙ Panel</button>
         <button id="auth-myq-btn" onclick="show('s-my-questions')" style="display:none;padding:6px 12px;border-radius:8px;border:none;background:var(--text);color:var(--bg);font-size:11px;font-weight:700;cursor:pointer">📝 Pytania</button>
         <button id="auth-stats-btn" onclick="openStatsModal()" style="display:none;padding:6px 10px;border-radius:8px;border:1.5px solid var(--rim);background:transparent;color:var(--muted);font-size:14px;cursor:pointer" title="Twoje statystyki">📊</button>
         <button onclick="openSettings()" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--rim);background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer" title="Ustawienia imienia">✏️</button>
@@ -416,7 +416,7 @@ onAuthStateChanged(auth, (user) => {
             <button class="dh-primary" type="button" onclick="openAuthModal('login')">Zaloguj się</button>
           </div>
           <div id="dh-auth-logged-in" style="display:none;align-items:center;gap:8px">
-            <button id="dh-admin-btn" class="dh-primary" type="button" style="display:none" onclick="show('s-admin')">Panel</button>
+            <button id="dh-admin-btn" class="dh-primary" type="button" style="display:none" onclick="location.href='./admin/'">Panel</button>
             <button class="dh-link" type="button" onclick="authSignOut()">Wyloguj</button>
           </div>
         </div>
