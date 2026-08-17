@@ -48,6 +48,7 @@ function App() {
   const [decisionId, setDecisionId] = useState('')
   const [editor, setEditor] = useState(null)
   const [focusedUserId, setFocusedUserId] = useState(null)
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState(() => new Set())
   const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, userQuestions: {}, users: {} })
 
   useEffect(() => {
@@ -101,14 +102,25 @@ function App() {
     setEditor(null)
   }
 
-  async function deleteQuestion(item) {
-    if (!window.confirm(`Usunąć pytanie „${item.text}”?`)) return
-    await update(ref(database), { [`questions/${item.id}`]: null })
+  function toggleQuestion(id) {
+    setSelectedQuestionIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function deleteSelectedQuestions() {
+    if (!selectedQuestionIds.size || !window.confirm(`Usunąć zaznaczone pytania (${selectedQuestionIds.size})?`)) return
+    const changes = Object.fromEntries([...selectedQuestionIds].map((id) => [`questions/${id}`, null]))
+    await update(ref(database), changes)
     setData((current) => {
       const questions = { ...current.questions }
-      delete questions[item.id]
+      selectedQuestionIds.forEach((id) => delete questions[id])
       return { ...current, questions }
     })
+    setSelectedQuestionIds(new Set())
   }
 
   const submissions = useMemo(() => flattenUserQuestions(data.userQuestions), [data.userQuestions])
@@ -134,7 +146,7 @@ function App() {
       <aside className="sidebar"><button className="back-button" type="button" onClick={redirectToGame}><Icon name="back" /> Wróć do gry</button><nav aria-label="Panel administracyjny"><p className="nav-label">Zarządzanie</p>{tabs.map((item) => <button className={`nav-item ${tab === item.id ? 'is-active' : ''}`} key={item.id} type="button" onClick={() => { setTab(item.id); if (item.id !== 'users') setFocusedUserId(null) }}><span>{item.label}</span>{counts[item.id] ? <span className="nav-count">{counts[item.id]}</span> : null}</button>)}</nav><p className="sidebar-foot">Wiem! · administracja</p></aside>
       <main className="workspace">
         <div className="workspace-heading"><div><h1>{screen.title}</h1><p>{screen.description}</p></div></div>
-        {tab === 'questions' && <section aria-label="Lista pytań"><div className="toolbar"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="question-toolbar-right"><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><button className="primary-action" type="button" onClick={startManualQuestion}>Dodaj pytanie</button></div></div><div className="question-list">{filteredLibrary.map((item) => { const author = authorFor(item, usersById); return <article className="question-row" key={item.id}><div className="question-content"><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div><div className="question-details"><span>Dodano: {formatDate(item.approvedAt || item.createdAt)}</span><span>przez <button className="author-link" type="button" onClick={() => openProfile(author.uid)} disabled={!author.uid}>{author.label}</button></span></div><div className="question-actions"><button type="button" onClick={() => setEditor({ ...item, a: [...item.answers], as: [...(item.as || [])], qs: item.qs || '' })}>Edytuj</button><button className="danger-action" type="button" onClick={() => deleteQuestion(item)}>Usuń</button></div></article>})}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
+        {tab === 'questions' && <section aria-label="Lista pytań"><div className="toolbar"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="question-toolbar-right"><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><button className="bulk-delete" type="button" disabled={!selectedQuestionIds.size} onClick={deleteSelectedQuestions}>Usuń zaznaczone ({selectedQuestionIds.size})</button><button className="primary-action" type="button" onClick={startManualQuestion}>Dodaj pytanie</button></div></div><div className="question-list">{filteredLibrary.map((item) => { const author = authorFor(item, usersById); return <article className={`question-row ${selectedQuestionIds.has(item.id) ? 'is-selected' : ''}`} key={item.id}><label className="question-check"><input type="checkbox" checked={selectedQuestionIds.has(item.id)} onChange={() => toggleQuestion(item.id)} aria-label={`Zaznacz ${item.text}`} /></label><div className="question-content"><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div><div className="question-details"><span>Dodano: {formatDate(item.approvedAt || item.createdAt)}</span><span>przez <button className="author-link" type="button" onClick={() => openProfile(author.uid)} disabled={!author.uid}>{author.label}</button></span></div><div className="question-actions"><button type="button" aria-label={`Edytuj ${item.text}`} onClick={() => setEditor({ ...item, a: [...item.answers], as: [...(item.as || [])], qs: item.qs || '' })}>Edytuj</button></div></article>})}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
         {tab === 'pending' && <List title="Oczekujące pytania" items={pending} render={(item) => <><strong>{item.text}</strong><small>{item.uid} · {formatDate(item.createdAt)}</small><div className="decision-actions"><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'approved')}>Zaakceptuj</button><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'rejected')}>Odrzuć</button></div></>} />}
         {tab === 'reports' && <List title="Zgłoszenia" items={reports} render={(item) => <><strong>{item.questionText || item.qText || 'Zgłoszenie bez treści pytania'}</strong><small>{item.status || (item.resolved ? 'rozwiązane' : 'otwarte')} · {formatDate(item.reportedAt)}</small></>} />}
         {tab === 'games' && <><List title="Rozgrywki" items={games} render={(item) => <><strong>{item.id}</strong><small>{item.phase || item.archiveStatus || 'brak statusu'} · {formatDate(item.updatedAt || item.createdAt)}</small></>} /><List title="Stałe pokoje" items={rooms} render={(item) => <><strong>{item.name || item.id}</strong><small>utworzono: {formatDate(item.created)}</small></>} /></>}

@@ -44,12 +44,23 @@ describe('Admin workspace', () => {
     expect(screen.getByText('Pytanie z biblioteki')).toBeInTheDocument()
     expect(screen.getByText('Pytanie zaakceptowane')).toBeInTheDocument()
     expect(screen.getByText('Kuba')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Edytuj' })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'Usuń' })).toHaveLength(2)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /Edytuj/ })).toHaveLength(2)
     expect(screen.queryByText('Pytanie odrzucone')).not.toBeInTheDocument()
   })
 
-  it('opens manual creation, saves an edit, and deletes a question through Firebase writes', async () => {
+  it('selects questions with checkboxes and deletes the selected Firebase records in one action', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Pytania' })
+    const checkbox = screen.getByRole('checkbox', { name: 'Zaznacz Pytanie z biblioteki' })
+    fireEvent.click(checkbox)
+    const deleteSelected = screen.getByRole('button', { name: 'Usuń zaznaczone (1)' })
+    expect(deleteSelected).toBeEnabled()
+    fireEvent.click(deleteSelected)
+    expect(Object.values(updateMock.mock.calls[0][1])[0]).toBeNull()
+  })
+
+  it('opens manual creation and saves it through Firebase', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Pytania' })
     fireEvent.click(screen.getByRole('button', { name: 'Dodaj pytanie' }))
@@ -58,10 +69,6 @@ describe('Admin workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz zmiany' }))
     expect(updateMock).toHaveBeenCalledTimes(1)
     expect(Object.keys(updateMock.mock.calls[0][1])[0]).toMatch(/^questions\/manual-/)
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Usuń' })[0])
-    expect(updateMock).toHaveBeenCalledTimes(2)
-    expect(Object.values(updateMock.mock.calls[1][1])[0]).toBeNull()
   })
 
   it('moves an accepted submission into the approved question library', async () => {
