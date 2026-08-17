@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { flattenUserQuestions, isAdminRole } from './adminData'
+import { flattenUserQuestions, isAdminRole, questionLibrary } from './adminData'
 
 describe('isAdminRole', () => {
   it('allows only the exact admin role', () => {
     expect(isAdminRole('admin')).toBe(true)
     expect(isAdminRole('moderator')).toBe(false)
     expect(isAdminRole(undefined)).toBe(false)
+  })
+})
+
+describe('questionLibrary', () => {
+  it('contains only the approved library records and never pending or rejected submissions', () => {
+    expect(questionLibrary({
+      base: { q: 'Pytanie bazowe' },
+      approved: { q: 'Pytanie zaakceptowane', status: 'approved' },
+      pending: { q: 'Pytanie oczekujące', status: 'pending' },
+      rejected: { q: 'Pytanie odrzucone', status: 'rejected' },
+    }).map(({ id, text }) => `${id}:${text}`)).toEqual([
+      'approved:Pytanie zaakceptowane',
+      'base:Pytanie bazowe',
+    ])
   })
 })
 

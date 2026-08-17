@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { get, ref } from 'firebase/database'
+import { get, ref, update } from 'firebase/database'
 import { auth, database } from './firebase'
-import { flattenUserQuestions, isAdminRole } from './adminData'
+import { flattenUserQuestions, isAdminRole, questionLibrary } from './adminData'
 import './App.css'
 
 const tabs = [
@@ -46,7 +46,8 @@ function App() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
-  const [data, setData] = useState({ games: {}, permanentRooms: {}, reports: {}, userQuestions: {}, users: {} })
+  const [decisionId, setDecisionId] = useState('')
+  const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, userQuestions: {}, users: {} })
 
   useEffect(() => {
     let active = true
@@ -55,7 +56,7 @@ function App() {
       try {
         const roleSnapshot = await get(ref(database, `users/${user.uid}/role`))
         if (!isAdminRole(roleSnapshot.val())) return redirectToGame()
-        const paths = ['games', 'permanentRooms', 'reports', 'userQuestions', 'users']
+        const paths = ['questions', 'games', 'permanentRooms', 'reports', 'userQuestions', 'users']
         const snapshots = await Promise.all(paths.map((path) => get(ref(database, path))))
         if (!active) return
         setData(Object.fromEntries(paths.map((path, index) => [path, snapshots[index].val() || {}])))
@@ -69,13 +70,36 @@ function App() {
     return () => { active = false; unsubscribe() }
   }, [])
 
+  async function decideSubmission(item, decision) {
+    const key = `user-${item.uid}-${item.id}`
+    setDecisionId(key)
+    try {
+      const changes = { [`userQuestions/${item.uid}/${item.id}/status`]: decision }
+      if (decision === 'approved') {
+        changes[`questions/${key}`] = { ...item, status: 'approved', source: 'user', approvedAt: Date.now() }
+      }
+      await update(ref(database), changes)
+      setData((current) => {
+        const next = structuredClone(current)
+        next.userQuestions[item.uid][item.id].status = decision
+        if (decision === 'approved') next.questions[key] = changes[`questions/${key}`]
+        return next
+      })
+    } catch {
+      setError('Nie udało się zapisać decyzji.')
+    } finally {
+      setDecisionId('')
+    }
+  }
+
   const submissions = useMemo(() => flattenUserQuestions(data.userQuestions), [data.userQuestions])
+  const library = useMemo(() => questionLibrary(data.questions), [data.questions])
   const pending = useMemo(() => submissions.filter((item) => item.status === 'pending'), [submissions])
   const reports = useMemo(() => toEntries(data.reports).sort((a, b) => (b.reportedAt || 0) - (a.reportedAt || 0)), [data.reports])
   const games = useMemo(() => toEntries(data.games).sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)), [data.games])
   const rooms = useMemo(() => toEntries(data.permanentRooms), [data.permanentRooms])
   const users = useMemo(() => toEntries(data.users).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)), [data.users])
-  const filteredSubmissions = useMemo(() => submissions.filter((item) => item.text.toLowerCase().includes(query.toLowerCase())), [submissions, query])
+  const filteredLibrary = useMemo(() => library.filter((item) => item.text.toLowerCase().includes(query.toLowerCase())), [library, query])
   const screen = copy[tab]
   const counts = { pending: pending.length, reports: reports.filter((item) => !item.resolved).length }
 
@@ -101,8 +125,8 @@ function App() {
         </aside>
         <main className="workspace">
           <div className="workspace-heading"><div><h1>{screen.title}</h1><p>{screen.description}</p></div></div>
-          {tab === 'questions' && <section aria-label="Lista pytań"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="list-summary"><span>{filteredSubmissions.length} przesłanych pytań</span></div><div className="question-list">{filteredSubmissions.map((item) => <article className="question-row" key={`${item.uid}/${item.id}`}><div className="question-main"><div className="question-meta"><span>{item.status || 'bez statusu'}</span><span>{formatDate(item.createdAt)}</span></div><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div></article>)}{!filteredSubmissions.length && <p className="empty-copy">Brak pytań w tej sekcji.</p>}</div></section>}
-          {tab === 'pending' && <List title="Oczekujące pytania" items={pending} render={(item) => <><strong>{item.text}</strong><small>{item.uid} · {formatDate(item.createdAt)}</small></>} />}
+          {tab === 'questions' && <section aria-label="Lista pytań"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><div className="question-list">{filteredLibrary.map((item) => <article className="question-row" key={item.id}><div className="question-main"><div className="question-meta"><span>{item.source === 'user' ? 'zaakceptowane od gracza' : 'biblioteka gry'}</span></div><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div></article>)}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
+          {tab === 'pending' && <List title="Oczekujące pytania" items={pending} render={(item) => <><strong>{item.text}</strong><small>{item.uid} · {formatDate(item.createdAt)}</small><div className="decision-actions"><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'approved')}>Zaakceptuj</button><button type="button" disabled={decisionId === `user-${item.uid}-${item.id}`} onClick={() => decideSubmission(item, 'rejected')}>Odrzuć</button></div></>} />}
           {tab === 'reports' && <List title="Zgłoszenia" items={reports} render={(item) => <><strong>{item.questionText || item.qText || 'Zgłoszenie bez treści pytania'}</strong><small>{item.status || (item.resolved ? 'rozwiązane' : 'otwarte')} · {formatDate(item.reportedAt)}</small></>} />}
           {tab === 'games' && <><List title="Rozgrywki" items={games} render={(item) => <><strong>{item.id}</strong><small>{item.phase || item.archiveStatus || 'brak statusu'} · {formatDate(item.updatedAt || item.createdAt)}</small></>} /><List title="Stałe pokoje" items={rooms} render={(item) => <><strong>{item.name || item.id}</strong><small>utworzono: {formatDate(item.created)}</small></>} /></>}
           {tab === 'users' && <List title="Użytkownicy" items={users} render={(item) => <><strong>{item.displayName || item.username || item.id}</strong><small>{item.role || 'user'} · utworzono: {formatDate(item.createdAt)}</small></>} />}

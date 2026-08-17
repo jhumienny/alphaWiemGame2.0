@@ -2,6 +2,18 @@ export function isAdminRole(role) {
   return role === 'admin'
 }
 
+export function questionLibrary(questions = {}) {
+  return Object.entries(questions)
+    .filter(([, question]) => !question?.status || question.status === 'approved')
+    .map(([id, question]) => ({
+      id,
+      ...question,
+      text: question?.q || question?.text || '(brak treści)',
+      answers: question?.a || question?.answers || [],
+    }))
+    .sort((first, second) => first.id.localeCompare(second.id))
+}
+
 export function flattenUserQuestions(userQuestions = {}) {
   return Object.entries(userQuestions)
     .flatMap(([uid, questions]) => Object.entries(questions || {}).map(([id, question]) => ({

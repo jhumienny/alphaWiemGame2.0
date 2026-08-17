@@ -26,6 +26,12 @@ test('only an existing admin role can read or write all admin data', () => {
   assert.equal(databaseRules.rules['.write'], adminRule);
 });
 
+test('question library is readable by the game but writable only by an admin', () => {
+  const adminRule = "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'";
+  assert.equal(databaseRules.rules.questions['.read'], true);
+  assert.equal(databaseRules.rules.questions['.write'], adminRule);
+});
+
 test('admin buttons open the separately deployed React panel', () => {
   assert.match(html, /id="dh-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);
   assert.match(html, /id="auth-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);
