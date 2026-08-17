@@ -3235,6 +3235,7 @@ function openAuthModal(mode) {
   $('auth-err').style.display = 'none';
   $('auth-inp-email').value = '';
   $('auth-inp-pass').value = '';
+  $('auth-inp-pass-confirm').value = '';
   updateAuthModalLabels();
   modal.style.display = 'flex';
   setTimeout(function(){ $('auth-inp-email').focus(); }, 80);
@@ -3262,6 +3263,8 @@ function updateAuthModalLabels() {
   $('auth-submit-btn').textContent  = isLogin ? 'Zaloguj się' : 'Utwórz konto';
   $('auth-tab-login').setAttribute('aria-selected', String(isLogin));
   $('auth-tab-register').setAttribute('aria-selected', String(!isLogin));
+  $('auth-inp-pass').autocomplete = isLogin ? 'current-password' : 'new-password';
+  $('auth-pass-confirm-field').style.display = isLogin ? 'none' : 'flex';
 }
 
 function authShowErr(msg) {
@@ -3288,11 +3291,17 @@ function authFirebaseErrMsg(code) {
 async function submitAuth() {
   const username = ($('auth-inp-email').value || '').trim().toLowerCase();
   const pass     = ($('auth-inp-pass').value  || '');
+  const passConfirm = ($('auth-inp-pass-confirm').value || '');
   if (!username) { authShowErr('Wpisz login.'); return; }
   if (_authMode === 'register' && !/^[a-z0-9_.-]{3,20}$/.test(username)) {
-    authShowErr('Login: 3\u201320 znak\u00f3w, tylko litery, cyfry, _ . -'); return;
+    authShowErr('Login: 3\u201320 znaków, tylko litery, cyfry, _ . -'); return;
   }
-  if (!pass) { authShowErr('Wpisz has\u0142o.'); return; }
+  if (!pass) { authShowErr('Wpisz hasło.'); return; }
+  if (_authMode === 'register' && pass !== passConfirm) {
+    authShowErr('Hasła nie są takie same.');
+    $('auth-inp-pass-confirm').focus();
+    return;
+  }
   const fakeEmail = username + '@wiem.app';
   const btn = $('auth-submit-btn');
   btn.disabled = true;
@@ -4532,6 +4541,10 @@ function desktopJoinGame(){
       </label>
       <label class="auth-field"> <span>Hasło</span>
         <input id="auth-inp-pass" type="password" autocomplete="current-password" placeholder="Co najmniej 6 znaków"
+          onkeydown="event.stopPropagation();if(event.key==='Enter')submitAuth()">
+      </label>
+      <label id="auth-pass-confirm-field" class="auth-field" style="display:none"> <span>Powtórz hasło</span>
+        <input id="auth-inp-pass-confirm" type="password" autocomplete="new-password" placeholder="Wpisz hasło ponownie"
           onkeydown="event.stopPropagation();if(event.key==='Enter')submitAuth()">
       </label>
     </div>
