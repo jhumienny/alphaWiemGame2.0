@@ -77,7 +77,7 @@ function App() {
   const [editor, setEditor] = useState(null)
   const [focusedUserId, setFocusedUserId] = useState(null)
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() => new Set())
-  const [expandedGroups, setExpandedGroups] = useState(() => ({ Pytania: true, Gracze: true }))
+  const [expandedGroups, setExpandedGroups] = useState(() => ({ Pytania: false, Gracze: false }))
   const [theme, setTheme] = useState(() => window.localStorage.getItem('wiem-admin-theme') || 'dark')
   document.documentElement.dataset.theme = theme
   const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {} })

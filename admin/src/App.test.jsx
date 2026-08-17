@@ -79,6 +79,7 @@ describe('Admin workspace', () => {
   it('moves an accepted submission into the approved question library', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Baza pytań' })
+    fireEvent.click(screen.getByRole('button', { name: 'Pytania' }))
     fireEvent.click(screen.getByRole('button', { name: /Propozycje pytań/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Zaakceptuj' }))
     expect(updateMock).toHaveBeenCalled()
@@ -87,6 +88,7 @@ describe('Admin workspace', () => {
   it('shows real pending-question and report counts in navigation', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Baza pytań' })
+    fireEvent.click(screen.getByRole('button', { name: 'Pytania' }))
     expect(screen.getByRole('button', { name: /Propozycje pytań\s*1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Zgłoszone pytania\s*1/ })).toBeInTheDocument()
   })
@@ -107,21 +109,20 @@ describe('Admin workspace', () => {
     expect(signOutMock).toHaveBeenCalledWith({})
   })
 
-  it('collapses and expands each grouped navigation card with an explicit arrow control', async () => {
+  it('starts each grouped navigation card collapsed and expands it with an explicit arrow control', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Baza pytań' })
     const questionsToggle = screen.getByRole('button', { name: 'Pytania' })
-    expect(questionsToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(questionsToggle).toHaveAttribute('aria-expanded', 'false')
     const questionMenu = document.getElementById('nav-group-Pytania')
     expect(questionMenu).not.toBeNull()
-    expect(questionMenu).not.toHaveClass('is-collapsed')
+    expect(questionMenu).toHaveClass('is-collapsed')
     fireEvent.click(questionsToggle)
-    expect(questionsToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(questionsToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Baza pytań' })).toBeInTheDocument()
+    fireEvent.click(questionsToggle)
     expect(questionMenu).toHaveClass('is-collapsed')
     expect(questionMenu).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.queryByRole('button', { name: 'Baza pytań' })).not.toBeInTheDocument()
-    fireEvent.click(questionsToggle)
-    expect(screen.getByRole('button', { name: 'Baza pytań' })).toBeInTheDocument()
   })
 
   it('organizes navigation into question and player cards, loads player reports, and opens player statistics', async () => {
@@ -130,6 +131,7 @@ describe('Admin workspace', () => {
 
     expect(screen.getByRole('navigation', { name: 'Panel administracyjny' })).toHaveTextContent('Pytania')
     expect(screen.getByRole('navigation', { name: 'Panel administracyjny' })).toHaveTextContent('Gracze')
+    fireEvent.click(screen.getByRole('button', { name: 'Gracze' }))
     expect(screen.getByRole('button', { name: /Zgłoszeni gracze/ })).toBeInTheDocument()
     expect(getMock).toHaveBeenCalledWith('playerReports')
 
