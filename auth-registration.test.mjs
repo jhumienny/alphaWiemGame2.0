@@ -32,6 +32,12 @@ test('question library is readable by the game but writable only by an admin', (
   assert.equal(databaseRules.rules.questions['.write'], adminRule);
 });
 
+test('the game refreshes its question library from Firebase', () => {
+  assert.match(html, /async function loadQuestionLibrary\(\)/);
+  assert.match(html, /\$\{DB_URL\}\/questions\.json/);
+  assert.match(html, /QS\.splice\(0, QS\.length, \.\.\.approvedQuestions\)/);
+});
+
 test('admin buttons open the separately deployed React panel', () => {
   assert.match(html, /id="dh-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);
   assert.match(html, /id="auth-admin-btn"[^>]*onclick="location\.href='\.\/admin\/'"/);

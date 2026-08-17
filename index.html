@@ -1104,6 +1104,19 @@ function hideErr(id){const e=$(id);if(e)e.style.display='none';}
 // ── DB config ──
 let DB_URL='https://alpha-wiem-game-2-preprod-default-rtdb.europe-west1.firebasedatabase.app';
 
+async function loadQuestionLibrary(){
+  try{
+    const response=await fetch(`${DB_URL}/questions.json`);
+    if(!response.ok) return;
+    const data=await response.json();
+    const approvedQuestions=Object.values(data||{}).filter(question=>question&&(!question.status||question.status==='approved'));
+    if(approvedQuestions.length) QS.splice(0, QS.length, ...approvedQuestions);
+  }catch(e){
+    // The bundled list remains an offline fallback if Firebase is unavailable.
+  }
+}
+loadQuestionLibrary();
+
 function getDbUrl(){ return true; }
 function saveDbUrl(){}
 function resetDb(){}
