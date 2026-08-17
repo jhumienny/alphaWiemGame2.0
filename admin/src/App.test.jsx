@@ -90,6 +90,18 @@ describe('Admin workspace', () => {
     expect(screen.getByRole('button', { name: /Zgłoszone pytania\s*1/ })).toBeInTheDocument()
   })
 
+  it('collapses and expands each grouped navigation card with an explicit arrow control', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Baza pytań' })
+    const questionsToggle = screen.getByRole('button', { name: 'Pytania' })
+    expect(questionsToggle).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(questionsToggle)
+    expect(questionsToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'Baza pytań' })).not.toBeInTheDocument()
+    fireEvent.click(questionsToggle)
+    expect(screen.getByRole('button', { name: 'Baza pytań' })).toBeInTheDocument()
+  })
+
   it('organizes navigation into question and player cards, loads player reports, and opens player statistics', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Baza pytań' })

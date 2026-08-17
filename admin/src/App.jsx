@@ -42,6 +42,7 @@ function Icon({ name }) {
   const paths = {
     search: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></>,
     back: <><path d="m14 6-6 6 6 6" /><path d="M8 12h12" /></>,
+    chevron: <path d="m7 10 5 5 5-5" />,
   }
   return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>
 }
@@ -76,6 +77,7 @@ function App() {
   const [editor, setEditor] = useState(null)
   const [focusedUserId, setFocusedUserId] = useState(null)
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() => new Set())
+  const [expandedGroups, setExpandedGroups] = useState(() => ({ Pytania: true, Gracze: true }))
   const [data, setData] = useState({ questions: {}, games: {}, permanentRooms: {}, reports: {}, playerReports: {}, userQuestions: {}, users: {} })
 
   useEffect(() => {
@@ -171,6 +173,7 @@ function App() {
   const counts = { pending: pending.length, reports: reports.filter((item) => !item.resolved).length, playerReports: playerReports.filter((item) => !item.resolved).length }
   const openProfile = (uid) => { if (uid) { setFocusedUserId(uid); setTab('users') } }
   const selectTab = (id) => { setTab(id); if (id !== 'users') setFocusedUserId(null) }
+  const toggleGroup = (title) => setExpandedGroups((current) => ({ ...current, [title]: !current[title] }))
 
   if (status === 'loading') return <main className="access-state">Sprawdzanie dostępu administratora…</main>
   if (status === 'error') return <main className="access-state"><strong>{error}</strong><button type="button" onClick={redirectToGame}>Wróć do gry</button></main>
@@ -178,7 +181,7 @@ function App() {
   return <div className="admin-app">
     <header className="topbar"><a className="brand" href="../">Wiem!</a><span className="topbar-separator" /><span className="topbar-title">Panel zarządzania</span><span className="profile" aria-label="Administrator">A</span></header>
     <div className="app-shell">
-      <aside className="sidebar"><button className="back-button" type="button" onClick={redirectToGame}><Icon name="back" /> Wróć do gry</button><nav aria-label="Panel administracyjny">{navigationGroups.map((group) => <section className="nav-card" key={group.title}><p className="nav-label">{group.title}</p>{group.items.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</section>)}<div className="nav-utilities">{utilityNavigation.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></nav><p className="sidebar-foot">Wiem! · administracja</p></aside>
+      <aside className="sidebar"><button className="back-button" type="button" onClick={redirectToGame}><Icon name="back" /> Wróć do gry</button><nav aria-label="Panel administracyjny">{navigationGroups.map((group) => <section className="nav-card" key={group.title}><button className="nav-group-toggle" type="button" aria-expanded={expandedGroups[group.title]} aria-controls={`nav-group-${group.title}`} onClick={() => toggleGroup(group.title)}><span>{group.title}</span><span className="nav-group-chevron"><Icon name="chevron" /></span></button>{expandedGroups[group.title] && <div className="nav-group-items" id={`nav-group-${group.title}`}>{group.items.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div>}</section>)}<div className="nav-utilities">{utilityNavigation.map((item) => <NavButton item={item} tab={tab} count={counts[item.id]} onSelect={selectTab} key={item.id} />)}</div></nav><p className="sidebar-foot">Wiem! · administracja</p></aside>
       <main className="workspace">
         <div className="workspace-heading"><div><h1>{screen.title}</h1><p>{screen.description}</p></div></div>
         {tab === 'questions' && <section aria-label="Lista pytań"><div className="toolbar"><label className="search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Szukaj pytania…" /></label><div className="question-toolbar-right"><div className="list-summary"><span>{filteredLibrary.length} pytań w bibliotece</span></div><button className="bulk-delete" type="button" disabled={!selectedQuestionIds.size} onClick={deleteSelectedQuestions}>Usuń zaznaczone ({selectedQuestionIds.size})</button><button className="primary-action" type="button" onClick={startManualQuestion}>Dodaj pytanie</button></div></div><div className="question-list">{filteredLibrary.map((item) => { const author = authorFor(item, usersById); return <article className={`question-row ${selectedQuestionIds.has(item.id) ? 'is-selected' : ''}`} key={item.id}><label className="question-check"><input type="checkbox" checked={selectedQuestionIds.has(item.id)} onChange={() => toggleQuestion(item.id)} aria-label={`Zaznacz ${item.text}`} /></label><div className="question-content"><h2>{item.text}</h2><div className="answers">{item.answers.map((answer, index) => <span key={`${item.id}-${index}`}>{answer}</span>)}</div></div><div className="question-details"><span>Dodano: {formatDate(item.approvedAt || item.createdAt)}</span><span>przez <button className="author-link" type="button" onClick={() => openProfile(author.uid)} disabled={!author.uid}>{author.label}</button></span></div><div className="question-actions"><button type="button" aria-label={`Edytuj ${item.text}`} onClick={() => setEditor({ ...item, a: [...item.answers], as: [...(item.as || [])], qs: item.qs || '' })}>Edytuj</button></div></article>})}{!filteredLibrary.length && <p className="empty-copy">Brak pytań w bibliotece.</p>}</div></section>}
