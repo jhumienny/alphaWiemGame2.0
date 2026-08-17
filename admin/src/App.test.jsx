@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
 const { updateMock } = vi.hoisted(() => ({ updateMock: vi.fn().mockResolvedValue(undefined) }))
@@ -35,6 +35,7 @@ vi.mock('firebase/database', () => ({
 import App from './App'
 
 afterEach(cleanup)
+beforeEach(() => { updateMock.mockClear(); vi.spyOn(window, 'confirm').mockReturnValue(true) })
 
 describe('Admin workspace', () => {
   it('shows data only after the authenticated account has the exact admin role', async () => {
@@ -46,6 +47,21 @@ describe('Admin workspace', () => {
     expect(screen.getAllByRole('button', { name: 'Edytuj' })).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Usuń' })).toHaveLength(2)
     expect(screen.queryByText('Pytanie odrzucone')).not.toBeInTheDocument()
+  })
+
+  it('opens manual creation, saves an edit, and deletes a question through Firebase writes', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Pytania' })
+    fireEvent.click(screen.getByRole('button', { name: 'Dodaj pytanie' }))
+    expect(screen.getByRole('heading', { name: 'Dodaj pytanie' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Pytanie dla pozostałych'), { target: { value: 'Nowe pytanie' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz zmiany' }))
+    expect(updateMock).toHaveBeenCalledTimes(1)
+    expect(Object.keys(updateMock.mock.calls[0][1])[0]).toMatch(/^questions\/manual-/)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Usuń' })[0])
+    expect(updateMock).toHaveBeenCalledTimes(2)
+    expect(Object.values(updateMock.mock.calls[1][1])[0]).toBeNull()
   })
 
   it('moves an accepted submission into the approved question library', async () => {

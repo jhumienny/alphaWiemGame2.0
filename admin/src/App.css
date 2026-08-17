@@ -39,6 +39,7 @@ h1 { margin-bottom: 7px; color: #242420; font-family: Manrope, sans-serif; font-
 .search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #373733; font-size: 12px; }
 .search input::placeholder { color: #aaa9a4; }
 .toolbar { padding: 18px 0 12px; }
+.question-toolbar-right { display: flex; align-items: center; gap: 12px; }
 .list-summary { padding: 0; color: #777772; font-size: 11px; }
 .question-list { display: grid; gap: 7px; }
 .question-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px auto; gap: 18px; align-items: center; padding: 13px 15px; border: 1px solid #e3e3df; border-radius: 10px; background: #fff; transition: border-color 160ms ease, box-shadow 160ms ease; }
