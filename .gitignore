@@ -1,0 +1,13 @@
+# Local dependencies and build output
+admin/node_modules/
+admin/dist/
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+
+firebase-config.local.js
